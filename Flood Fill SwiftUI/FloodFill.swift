@@ -110,8 +110,8 @@ struct FloodFill: View {
         Canvas { context, size in
             let width = (size.width - spacing * CGFloat(grid.size + 1)) / CGFloat(grid.size)
             
-            for y in 0 ..< Int(grid.size) {
-                for x in 0 ..< Int(grid.size) {
+            for y in 0 ..< Int(grid.rows.count) {
+                for x in 0 ..< Int(grid.rows.count) {
                     let x1 = CGFloat(x) * (width + spacing) + spacing
                     let y1 = CGFloat(y) * (width + spacing) + spacing
                     let frame = CGRect(x: x1, y: y1, width: width, height: width)
@@ -225,7 +225,7 @@ class Grid: Identifiable, ObservableObject {
     }
     
     func isValidCell(x: Int, y: Int) -> Bool {
-        guard x >= 0 && y >= 0 && x < Int(size) && y < Int(size)
+        guard x >= 0 && y >= 0 && x < rows.count && y < rows.count
         else { return false }
         return rows[y].cells[x].filled == false
     }
