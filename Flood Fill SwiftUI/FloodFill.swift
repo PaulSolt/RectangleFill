@@ -10,15 +10,33 @@ import SwiftUI
 struct FloodFill: View {
     
     @ObservedObject var grid: Grid
+    var spacing: CGFloat
+    var maxSize: CGFloat = 100
+    var minSize: CGFloat = 2
     
-    init(grid: Grid) {
+    init(grid: Grid, spacing: CGFloat) {
         self.grid = grid
+        self.spacing = spacing
     }
     
     var body: some View {
         
         TabView {
-            
+            VStack {    // 2D coordinate math
+                Spacer()
+                Text("2D Canvas SwiftUI Grid")
+                    .font(.headline)
+                canvasGrid
+                resetButton
+                Slider(value: $grid.size, in: minSize...maxSize) { isEditing in
+                    // Always show updates when sliding for Canvas
+                        self.grid.objectWillChange.send()
+                }
+                Spacer()
+            }
+            .tabItem {
+                Label("2D Canvas", systemImage: "view.2d")
+            }
             VStack {    // Rectangles with individual gesture recognizers
                 Spacer()
                 Text("Rectangle SwiftUI Grid")
@@ -26,22 +44,17 @@ struct FloodFill: View {
                 
                 rectangleGrid
                 resetButton
+                Slider(value: $grid.size, in: minSize...maxSize) { isEditing in
+                    if !isEditing {
+                        // Only update when finished editing, too slow to update
+                        self.grid.objectWillChange.send()
+                        reset()
+                    }
+                }
                 Spacer()
             }
             .tabItem {
                 Label("Rectangle Grid", systemImage: "square.grid.2x2")
-            }
-            
-            VStack {    // 2D coordinate math
-                Spacer()
-                Text("2D Canvas SwiftUI Grid")
-                    .font(.headline)
-                canvasGrid
-                resetButton
-                Spacer()
-            }
-            .tabItem {
-                Label("2D Canvas", systemImage: "view.2d")
             }
         }
         .overlay(
@@ -61,17 +74,18 @@ struct FloodFill: View {
         })
     }
     
+    // Works for small numbers of views < 10-20, not good performance for large numbers of pixels
     var rectangleGrid: some View {
-        VStack {
+        VStack(spacing: spacing) {
             ForEach(grid.rows) { row in
-                HStack {
+                HStack(spacing: spacing) {
                     ForEach(row.cells) { cell in
                         if let filled = cell.filled {
                             
                             Rectangle()
                                 .foregroundColor(filled ? Color.blue : Color.white)
                                 .onTapGesture {
-                                    grid.objectWillChange.send() // Force layout update
+                                    grid.objectWillChange.send() // Force layout update because we have nested ObservableObjects
                                     grid.floodFill(x: cell.point.x, y: cell.point.y)
                                 }
                         } else {
@@ -85,7 +99,7 @@ struct FloodFill: View {
             }
         }
         .aspectRatio(contentMode: .fit)
-        .padding(8)
+        .padding(spacing)
         .background(Color.init(white: 0.9))
     }
     
@@ -94,18 +108,17 @@ struct FloodFill: View {
     // Alternate canvas view - uses cellAtPoint(x:,y:) logic
     var canvasGrid: some View {
         Canvas { context, size in
-            let spacing: CGFloat = 8
             let width = (size.width - spacing * CGFloat(grid.size + 1)) / CGFloat(grid.size)
             
-            for y in 0 ..< grid.size {
-                for x in 0 ..< grid.size {
+            for y in 0 ..< Int(grid.size) {
+                for x in 0 ..< Int(grid.size) {
                     let x1 = CGFloat(x) * (width + spacing) + spacing
                     let y1 = CGFloat(y) * (width + spacing) + spacing
                     let frame = CGRect(x: x1, y: y1, width: width, height: width)
                     
                     var color: Color = .black
                     
-                    if let filled = grid.rows[y].cells[x].filled {
+                    if let filled = grid.rows[y].cells[x].filled { // FIXME: Thread 1: Fatal error: Index out of range
                         color = filled ? .blue : .white
                     }
                     context.fill(Rectangle().path(in: frame), with: .color(color))
@@ -139,7 +152,7 @@ struct FloodFill: View {
         var yOut: Int = 0
         let cellWidth = canvasSize.width / CGFloat(grid.size) // Treat top left edge as part of grid
         
-        for i in 0..<grid.size {
+        for i in 0 ..< Int(grid.size) {
             if point.x >= xPos && point.x < xPos + cellWidth {
                 xOut = i
                 break
@@ -147,7 +160,7 @@ struct FloodFill: View {
             xPos += cellWidth
         }
         
-        for i in 0..<grid.size {
+        for i in 0 ..< Int(grid.size) {
             if point.y >= yPos && point.y < yPos + cellWidth {
                 yOut = i
                 break
@@ -165,10 +178,10 @@ struct FloodFill: View {
 class Grid: Identifiable, ObservableObject {
     let id: UUID = UUID()
     @Published var rows: [Row]
-    let size: Int
+    @Published var size: CGFloat
     
     init(_ size: Int) {
-        self.size = size
+        self.size = CGFloat(size)
         self.rows = [Row]()
         self.rows = generateBoard(size: size)
     }
@@ -188,7 +201,7 @@ class Grid: Identifiable, ObservableObject {
     }
     
     func reset() {
-        rows = generateBoard(size: size)
+        rows = generateBoard(size: Int(size))
     }
     
     func floodFill(x: Int, y: Int) {
@@ -212,7 +225,8 @@ class Grid: Identifiable, ObservableObject {
     }
     
     func isValidCell(x: Int, y: Int) -> Bool {
-        guard x >= 0 && y >= 0 && x < size && y < size else { return false }
+        guard x >= 0 && y >= 0 && x < Int(size) && y < Int(size)
+        else { return false }
         return rows[y].cells[x].filled == false
     }
 }
@@ -239,5 +253,5 @@ class Row: Identifiable, ObservableObject {
 }
 
 #Preview {
-    FloodFill(grid: Grid(9))
+    FloodFill(grid: Grid(9), spacing: 1)
 }

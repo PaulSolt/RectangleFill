@@ -11,7 +11,7 @@ import SwiftUI
 struct Flood_Fill_SwiftUIApp: App {
     var body: some Scene {
         WindowGroup {
-            FloodFill(grid: Grid(9))
+            FloodFill(grid: Grid(100), spacing: 0)
         }
     }
 }
